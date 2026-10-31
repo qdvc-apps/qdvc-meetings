@@ -13,27 +13,41 @@ struct MeetingListView: View {
             if sections.isEmpty {
                 EmptyListView()
             } else {
-                List(selection: $model.selectedMeetingID) {
-                    ForEach(sections) { section in
-                        Section(isExpanded: expanded(section.id)) {
-                            ForEach(section.meetings) { m in
-                                MeetingRow(meeting: m, showsDate: !section.bucket.isSingleDay)
-                                    .tag(m.id)
+                ScrollViewReader { proxy in
+                    List(selection: $model.selectedMeetingID) {
+                        ForEach(sections) { section in
+                            Section(isExpanded: expanded(section.id)) {
+                                ForEach(section.meetings) { m in
+                                    MeetingRow(meeting: m, showsDate: !section.bucket.isSingleDay)
+                                        .tag(m.id)
+                                        .id(m.id)
+                                }
+                            } header: {
+                                Text(section.bucket.title)
                             }
-                        } header: {
-                            Text(section.bucket.title)
                         }
                     }
-                }
-                .listStyle(.inset)
-                .contextMenu(forSelectionType: UUID.self) { ids in
-                    if let id = ids.first {
-                        MeetingContextMenu(meetingID: id)
+                    .listStyle(.inset)
+                    .contextMenu(forSelectionType: UUID.self) { ids in
+                        if let id = ids.first {
+                            MeetingContextMenu(meetingID: id)
+                        }
+                    } primaryAction: { ids in
+                        model.editMeeting(ids.first)
                     }
-                } primaryAction: { ids in
-                    model.editMeeting(ids.first)
+                    .onAppear { scroll(proxy) }
+                    .onChange(of: model.listScrollTarget) { _, _ in scroll(proxy) }
                 }
             }
+        }
+    }
+
+    /// Scrolls to a meeting sent from the calendar, once the rows exist.
+    private func scroll(_ proxy: ScrollViewProxy) {
+        guard let id = model.listScrollTarget else { return }
+        Task { @MainActor in
+            proxy.scrollTo(id, anchor: .center)
+            model.listScrollTarget = nil
         }
     }
 
@@ -92,8 +106,14 @@ struct MeetingRow: View {
         let m = meeting
         let kind = m.locationKind
         VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(m.title).fontWeight(.semibold).lineLimit(1)
+                if let n = model.attachments[m.id]?.count {
+                    Image(systemName: "paperclip")
+                        .imageScale(.small)
+                        .foregroundStyle(.secondary)
+                        .help("\(n) attachment\(n == 1 ? "" : "s")")
+                }
                 Spacer(minLength: 6)
                 Text(showsDate ? "\(model.formatter.shortDate(m.date)), \(model.formatter.time(m.time))"
                                : model.formatter.time(m.time))
@@ -181,6 +201,7 @@ struct MeetingContextMenu: View {
         let m = model.meeting(meetingID)
         Button("Edit Meeting\u{2026}") { model.editMeeting(meetingID) }
         Button("Duplicate Meeting") { model.duplicateMeeting(meetingID) }
+        Button("Add Attachments\u{2026}") { model.chooseAttachments(meetingID) }
         if let m, let title = m.locationKind.actionTitle {
             Divider()
             Button(title) { model.openLocation(meetingID) }

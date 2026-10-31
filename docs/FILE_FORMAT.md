@@ -19,7 +19,9 @@ its tests check it.
 - A folder counts as a workspace if it contains `meetings/`. Opening any
   other folder (after confirmation) creates `meetings/`.
 - Every `*.yml` or `*.yaml` file anywhere under `meetings/` is a meeting,
-  whatever its name or folder. Hidden files and folders (names starting
+  whatever its name or folder, **except** inside an attachments folder: a
+  folder with a meeting file of the same name beside it (§3.4). So a `.yml`
+  file attached to a meeting is never read as a meeting. Hidden files and folders (names starting
   with `.`) are ignored, so sync-tool folders such as Syncthing's
   `.stversions` do not create phantom meetings.
 - Files are written atomically and immediately. Encoding is UTF-8 with `\n`
@@ -36,9 +38,12 @@ meetings/2026/2026-10-05-1400-budget-review.yml
 
 - The folder is the meeting's year, `meetings/<yyyy>`.
 - The stem is `<yyyy-mm-dd>-<hhmm>-<title-slug>`, at most 56 characters.
-- If the name is taken, `-2`, `-3`… is added: `…-budget-review-2.yml`.
+- If the name is taken, `-2`, `-3`… is added: `…-budget-review-2.yml`. A
+  folder of the same name (without `.yml`) also counts as taken, so a new
+  meeting never adopts an existing folder as its attachments.
 - The file is renamed (and moved to another year folder) when the meeting's
-  date, time or title changes, so the folder reads as a chronological log.
+  date, time or title changes, and its attachments folder (§3.4) moves with
+  it, so the folder reads as a chronological log.
   A name that differs only by its collision suffix is left alone. A year
   folder left empty by a move or a deletion is removed.
 - The name is only a convenience: the app never reads anything from it. A
@@ -169,6 +174,32 @@ Each item in `notes` is a mapping:
   action item into a decision and back loses nothing), but are only shown,
   searched, counted and exported for action items.
 - A plain string in the list reads as a plain note with that text.
+
+### 3.4 Attachments
+
+A meeting's attachments are the files in the folder beside its file with
+the same name minus the extension:
+
+```
+meetings/2026/2026-09-14-1000-project-kick-off.yml
+meetings/2026/2026-09-14-1000-project-kick-off/
+    Agenda.pdf
+    Whiteboard photo.png
+```
+
+- The folder is created when the first file is attached, and removed when
+  the last is moved to the Trash (a folder holding only `.DS_Store` counts
+  as empty). It follows the meeting's file when that is renamed or moved to
+  another year, and goes to the Trash with it when the meeting is deleted.
+- Nothing about attachments is stored in the meeting file: the folder's
+  contents are the attachments, so files added or removed in Finder show up
+  on the next refresh.
+- Attachments keep the names they were given. When a name is taken
+  (ignoring case), a number is added before the extension, as Finder does:
+  `photo.png`, `photo 2.png`, `photo 3.png`. These names are exempt from
+  the slug rules in §2.
+- Hidden files (names starting with `.`) are not shown. Folders inside the
+  attachments folder are shown as single attachments.
 
 ## 4. `platforms.yml`
 

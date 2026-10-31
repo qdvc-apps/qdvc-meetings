@@ -38,9 +38,10 @@ there are no parity fixtures; the file format in §8 is its own.
 ## 2. Window layout
 
 One window, a `NavigationSplitView` with a collapsible sidebar (⌃⌘S, View →
-Hide Sidebar). To its right sit the **meetings** (as a list or a month
-calendar) and the **meeting pane**, side by side in an `HSplitView`, as Mail
-places its message list and reading pane. The window opens at about
+Hide Sidebar). To its right sit either the **meeting list** and the **meeting pane**, side
+by side in an `HSplitView`, as Mail places its message list and reading
+pane, or the **month calendar** on its own, using the full width (as
+Calendar's Month view has no inspector open by default). The window opens at about
 1200 × 760 pt and works down to about 900 × 560 pt; hiding the sidebar
 recovers its width.
 
@@ -114,7 +115,10 @@ Teams and Zoom, and a **notes symbol**, in the accent colour, when the
 meeting has notes), then "2 more", which shows all of the day's meetings in a
 popover. The number of chips adapts to the window's height. Today's date is circled in the accent colour.
 
-- Click a chip to show the meeting in the meeting pane.
+- **Click a chip to show the meeting in the list:** the view switches to
+  List, under Upcoming (today onwards) or Past, with the meeting selected,
+  its heading expanded and the list scrolled to it, so its pane is beside
+  it. The calendar has no meeting pane of its own.
 - Double-click an empty part of a day to create a meeting on that day.
 - Drag a chip to another day to move the meeting (keeping its time), as in
   Calendar. Undo (⌘Z) moves it back.
@@ -135,7 +139,8 @@ Laid out like Calendar's event inspector, then Reminders-style notes:
    there are no instructions for that platform.
 4. **People** as tokens. Clicking one selects them in the sidebar.
 5. **Description**, if any.
-6. **Notes** (§3).
+6. **Attachments** (§3a), when there are any.
+7. **Notes** (§3).
 
 Edit Meeting (⌘E), Duplicate Meeting (⌘D) and the Export menu are also
 reachable from a `…` menu at the top right of the pane.
@@ -174,6 +179,30 @@ Reminders:
   Undo step. Move Up / Move Down (⌥⌘↑ / ⌥⌘↓, and the note's context menu)
   do the same from the keyboard. Delete with ⌫ on an empty note or
   from the context menu. All note edits are undoable (⌘Z).
+
+## 3a. Attachments
+
+Files of any kind (a screenshot, a photo of the whiteboard, the slides) can
+be attached to a meeting. They are **copied** into a folder named like the
+meeting's file, beside it (FILE_FORMAT.md §3.4), so they stay with the
+meeting in Finder, in backups and in sync.
+
+- **Attach** with Meeting → Add Attachments… (⇧⌘A, as Mail's Attach Files),
+  the paperclip button in the meeting pane's header, or by **dropping files**
+  from Finder, Mail or Photos anywhere on the meeting pane (it is outlined
+  while you drag, and says "Drop to attach to this meeting").
+- **Shown** as Quick Look thumbnails (the file's icon when Quick Look has no
+  preview) in an Attachments section above the notes, with name and size.
+  Clicking one opens **Quick Look**, where ← / → move between the meeting's
+  attachments. Its context menu has Open, Reveal in Finder and Move to
+  Trash. Dragging one out copies it, for instance into a Mail message.
+- **Names are kept** as they were; a name already taken gets a number, as
+  Finder does ("photo 2.png").
+- **Indicators:** a paperclip after the title in the list (as in Mail) and
+  on calendar chips, and the count in their tooltips.
+- Removing an attachment moves it to the **Trash**; the folder itself goes
+  when it is empty. Deleting a meeting moves its folder to the Trash too.
+  Duplicate Meeting does not copy attachments.
 
 ## 4. Meetings: creating and editing
 
@@ -402,3 +431,11 @@ Changes made while building:
   15 minutes to 2 hours; 1 hour by default).
 - Search (⌘F, Edit → Search Meetings) looks through every date, as Mail's
   search looks through every mailbox; in Calendar view it filters the grid.
+
+Changes asked for after the first build:
+
+- The calendar has no meeting pane; clicking a meeting shows it in the list
+  under Upcoming or Past (§2.4).
+- Meetings can have attachments (§3a), kept in a folder beside the meeting
+  file. Attachment names are kept as given, not slugified; only the meeting
+  file and its folder follow the slug rules.

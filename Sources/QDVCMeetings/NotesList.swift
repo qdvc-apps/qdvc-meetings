@@ -28,7 +28,7 @@ struct NotesList: View {
                 ForEach(m.notes) { note in
                     NoteRow(meeting: m, note: note, focused: $focused)
                         .opacity(model.draggingNoteID == note.id ? 0.35 : 1)
-                        .onDrop(of: [.text], isTargeted: hoverBinding(over: note.id)) { _ in finishDrop() }
+                        .onDrop(of: [.text, .fileURL], isTargeted: hoverBinding(over: note.id)) { finishDrop($0) }
                     Divider()
                 }
                 Button {
@@ -42,7 +42,7 @@ struct NotesList: View {
                 .foregroundStyle(.secondary)
                 .padding(.vertical, 8)
                 .help("Add a note (\u{21E7}\u{2318}N)")
-                .onDrop(of: [.text], isTargeted: hoverBinding(over: nil)) { _ in finishDrop() }
+                .onDrop(of: [.text, .fileURL], isTargeted: hoverBinding(over: nil)) { finishDrop($0) }
             }
         }
         // Hover events stop during a drag and resume after it, so a hover
@@ -69,10 +69,14 @@ struct NotesList: View {
         })
     }
 
-    private func finishDrop() -> Bool {
-        let wasNoteDrag = model.draggingNoteID != nil
-        model.endNoteDrag(in: meetingID)
-        return wasNoteDrag
+    /// Ends a note drag; anything else dropped here (files from Finder) is
+    /// passed on to be attached, since the rows would otherwise swallow it.
+    private func finishDrop(_ providers: [NSItemProvider]) -> Bool {
+        if model.draggingNoteID != nil {
+            model.endNoteDrag(in: meetingID)
+            return true
+        }
+        return model.importDroppedFiles(providers, to: meetingID)
     }
 }
 

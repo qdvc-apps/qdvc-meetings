@@ -133,8 +133,8 @@ private struct DayCell: View {
 }
 
 /// A meeting in the grid: time, title, the platform symbol, and a notes
-/// symbol when it has notes. Click selects it, double-click edits it, and
-/// dragging it to another day moves it.
+/// symbol when it has notes. Clicking it shows it in the list (under
+/// Upcoming or Past); dragging it to another day moves it.
 struct MeetingChip: View {
     @Environment(AppModel.self) private var model
     let meeting: Meeting
@@ -154,6 +154,10 @@ struct MeetingChip: View {
                 Image(systemName: "video.fill")
                     .foregroundStyle(selected ? Color.white : Color.secondary)
             }
+            if model.attachments[m.id] != nil {
+                Image(systemName: "paperclip")
+                    .foregroundStyle(selected ? Color.white : Color.secondary)
+            }
             if m.hasNotes {
                 Image(systemName: "note.text")
                     .fontWeight(.semibold)
@@ -167,8 +171,7 @@ struct MeetingChip: View {
         .background(RoundedRectangle(cornerRadius: 4)
             .fill(selected ? Color.accentColor : Color.accentColor.opacity(0.12)))
         .contentShape(Rectangle())
-        .onTapGesture(count: 2) { model.editMeeting(m.id) }
-        .simultaneousGesture(TapGesture().onEnded { model.selectedMeetingID = m.id })
+        .onTapGesture { model.showInList(m.id) }
         .draggable(DragPayload.meeting(m.id)) {
             Text(m.title)
                 .font(.caption)
@@ -181,12 +184,15 @@ struct MeetingChip: View {
 
     private func chipHelp(_ m: Meeting) -> String {
         var s = "\(model.formatter.timeRange(m)) \(m.title)"
+        if let n = model.attachments[m.id]?.count {
+            s += " \u{2014} \(n) attachment\(n == 1 ? "" : "s")"
+        }
         if m.hasNotes {
             s += " \u{2014} \(m.noteCount) note\(m.noteCount == 1 ? "" : "s")"
         } else if m.date <= model.today {
             s += " \u{2014} no notes"
         }
-        return s
+        return s + "\nClick to show in the list; drag to another day to move it."
     }
 }
 

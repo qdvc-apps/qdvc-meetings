@@ -331,6 +331,52 @@ final class WorkspaceTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent("meetings/2026").path))
     }
 
+    func testAttachments() throws {
+        let ws = Workspace(root: root)
+        try ws.ensureLayout()
+        var m = Meeting(title: "Site visit", date: LocalDate("2026-10-07")!, time: LocalTime("11:00")!)
+        m = try ws.save(m)
+        XCTAssertEqual(Workspace.attachmentsFolder(forMeetingPath: m.relativePath!), "meetings/2026/2026-10-07-1100-site-visit")
+
+        let src = root.appendingPathComponent("src")
+        try FileManager.default.createDirectory(at: src, withIntermediateDirectories: true)
+        let photo = src.appendingPathComponent("Photo.PNG")
+        try Data("png".utf8).write(to: photo)
+        // A .yml attachment must not be read as a meeting.
+        let config = src.appendingPathComponent("config.yml")
+        try "date: 2026-01-01\ntime: '09:00'\n".write(to: config, atomically: true, encoding: .utf8)
+
+        XCTAssertEqual(try ws.addAttachments([photo, config], toMeetingPath: m.relativePath!), ["Photo.PNG", "config.yml"])
+        XCTAssertEqual(try ws.addAttachments([photo], toMeetingPath: m.relativePath!), ["Photo 2.PNG"])
+        let inFolder = ws.url(for: "meetings/2026/2026-10-07-1100-site-visit/Photo.PNG")
+        XCTAssertEqual(try ws.addAttachments([inFolder], toMeetingPath: m.relativePath!), [])
+
+        let result = ws.load()
+        XCTAssertEqual(result.meetings.count, 1)
+        XCTAssertEqual(result.attachments[m.relativePath!]?.map(\.name), ["config.yml", "Photo 2.PNG", "Photo.PNG"])
+        XCTAssertEqual(result.attachments[m.relativePath!]?.first?.size, 31)
+
+        // Renaming the meeting moves its folder, across years too.
+        m.title = "Site walk"
+        m.date = LocalDate("2027-03-01")!
+        m = try ws.save(m)
+        XCTAssertEqual(m.relativePath, "meetings/2027/2027-03-01-1100-site-walk.yml")
+        XCTAssertEqual(ws.attachments(forMeetingPath: m.relativePath!).count, 3)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: ws.url(for: "meetings/2026").path))
+
+        // A folder already using a stem pushes a new meeting to -2.
+        try FileManager.default.createDirectory(at: ws.url(for: "meetings/2027/2027-03-02-0900-x"), withIntermediateDirectories: true)
+        let other = try ws.save(Meeting(title: "X", date: LocalDate("2027-03-02")!, time: LocalTime("09:00")!))
+        XCTAssertEqual(other.relativePath, "meetings/2027/2027-03-02-0900-x-2.yml")
+
+        for a in ws.attachments(forMeetingPath: m.relativePath!) {
+            try FileManager.default.removeItem(at: ws.url(for: a.relativePath))
+        }
+        ws.removeAttachmentsFolderIfEmpty(forMeetingPath: m.relativePath!)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: ws.url(for: "meetings/2027/2027-03-01-1100-site-walk").path))
+        XCTAssertEqual(Workspace.uniqueAttachmentName("notes", taken: ["notes", "notes 2"]), "notes 3")
+    }
+
     func testPlatformsFile() throws {
         let ws = Workspace(root: root)
         XCTAssertEqual(try ws.loadPlatformInstructions(), PlatformInstructions())

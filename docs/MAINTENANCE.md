@@ -18,7 +18,7 @@ Tests/MeetingsCoreTests/      unit tests
 tools/make_icon.py            regenerates Resources/AppIcon.{svg,icns}
 scripts/build-app.sh          builds and ad-hoc signs "QDVC Meetings.app"
 Resources/Info.plist          bundle id org.qdvc.meetings.mac
-sample-workspace/             nine meetings and platform instructions, written by MeetingsCore
+sample-workspace/             nine meetings (one with two attachments) and platform instructions
 docs/                         DESIGN, FILE_FORMAT, this guide
 ```
 
@@ -46,7 +46,7 @@ writes `build/icon-preview.png`.
 | `Naming.swift` | the slug, file stems, collision suffixes, export file names |
 | `People.swift` | name normalisation, `PeopleIndex` (derived people, suggestions, short names), renaming |
 | `MeetingFile.swift` | reading and writing meeting files and `platforms.yml` (key order, quoting, unknown keys) |
-| `Workspace.swift` | finding, loading (cached by modification date and size), saving with renames, platform instructions |
+| `Workspace.swift` | scanning (meeting files and attachments folders), loading (cached by modification date and size), saving with renames that carry the attachments folder along, adding and listing attachments, platform instructions |
 | `Formatting.swift` | `DateBucketer` (list headings) and `MeetingFormatter` (dates and times in the user's locale, cached formatters) |
 | `Export.swift` | the content shared by exports; plain text and Markdown |
 | `DOCX.swift`, `Zip.swift` | the Word document (OOXML parts) and a stored-entry ZIP writer with CRC-32 |
@@ -56,7 +56,8 @@ The app (`QDVCMeetings`): `MeetingsApp` (scenes, app delegate), `AppModel`
 shortcuts), `ContentView` (window, toolbar, banners, welcome screen,
 dialogs), `SidebarView` (and Rename Person), `MeetingListView` (rows, the
 notes badge, context menu), `CalendarMonthView` (grid, chips, drag
-payloads), `MeetingPane` (header, location, callout, people, `FlowLayout`),
+payloads), `MeetingPane` (header, location, callout, people, attachments with Quick
+Look thumbnails, file drops, `FlowLayout`),
 `NotesList` (inline notes, kinds, assignees, drag and drop),
 `TokenField` (`NSTokenField` wrapper), `MeetingSheet`, `SettingsView`,
 `Prefs`, `Platform` (AppKit services and symbols).
@@ -82,7 +83,17 @@ when its date, time or title changed.
   changed on disk. A meeting with unsaved typing keeps its in-memory
   version.
 
-### 2.2 Note drag and drop
+### 2.2 Attachments
+
+Attachments are not part of `Meeting`: the app keeps them in
+`AppModel.attachments`, by meeting, filled from `LoadResult.attachments` on
+every load and re-listed after each add, remove or rename. Undo therefore
+never touches them. File drops anywhere on the meeting pane go to
+`importDroppedFiles`; the notes rows also accept file drops (they are drop
+targets for note reordering, and would otherwise swallow them) and pass
+them on.
+
+### 2.3 Note drag and drop
 
 Notes are dragged by their ≡ handle (`onDrag`, which also records a
 snapshot). Each row is a drop target whose `isTargeted` callback moves the
@@ -124,7 +135,9 @@ swift test
 `CoreTests.swift` covers dates, location kinds, slugs and paths, the people
 index and suggestions, reading and writing meeting files (including a
 byte-for-byte round trip), the workspace (save, collisions, renames across
-years, unreadable files, folder clean-up), list headings, and the three
+years, unreadable files, folder clean-up), attachments (copying, Finder-style
+name numbering, `.yml` attachments not read as meetings, the folder moving
+with a renamed meeting), list headings, and the three
 exports (including a CRC-32 check and the DOCX parts).
 
 The core and its tests also build with a Linux Swift toolchain (5.8 or

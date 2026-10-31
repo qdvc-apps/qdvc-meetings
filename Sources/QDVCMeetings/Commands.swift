@@ -95,6 +95,9 @@ struct MeetingsCommands: Commands {
             Button("Duplicate Meeting") { model.duplicateMeeting(nil) }
                 .keyboardShortcut("d")
                 .disabled(m == nil)
+            Button("Add Attachments\u{2026}") { model.chooseAttachments(nil) }
+                .keyboardShortcut("a", modifiers: [.command, .shift])
+                .disabled(m == nil)
             Divider()
             Button(m?.locationKind.actionTitle ?? "Join") { model.openLocation(nil) }
                 .keyboardShortcut("j")

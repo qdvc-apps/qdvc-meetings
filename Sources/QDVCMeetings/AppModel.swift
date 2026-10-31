@@ -157,6 +157,8 @@ final class AppModel {
     private(set) var workspace: Workspace?
     private(set) var meetings: [Meeting] = []
     private(set) var failures: [LoadFailure] = []
+    /// Each meeting's attachments (the files in the folder beside its file).
+    private(set) var attachments: [UUID: [Attachment]] = [:]
     private(set) var people = PeopleIndex(meetings: [])
     private(set) var instructions = PlatformInstructions()
     private(set) var instructionsError: String?
@@ -187,6 +189,11 @@ final class AppModel {
     /// The toolbar Export button shows a checkmark after a copy.
     private(set) var justCopied = false
     var collapsedBuckets: Set<String> = []
+    /// A meeting the list should scroll to (observed by MeetingListView).
+    var listScrollTarget: UUID?
+    /// Quick Look: the attachment shown, and its siblings for ← / →.
+    var quickLookURL: URL?
+    private(set) var quickLookURLs: [URL] = []
 
     var reopenLast: Bool = Prefs.reopenLast {
         didSet { Prefs.reopenLast = reopenLast }
@@ -284,6 +291,7 @@ final class AppModel {
         workspace = nil
         meetings = []
         failures = []
+        attachments = [:]
         people = PeopleIndex(meetings: [])
         instructions = PlatformInstructions()
         selectedMeetingID = nil
@@ -345,6 +353,11 @@ final class AppModel {
         }
         meetings = loaded
         failures = result.failures
+        var byID: [UUID: [Attachment]] = [:]
+        for m in loaded {
+            if let path = m.relativePath, let list = result.attachments[path] { byID[m.id] = list }
+        }
+        attachments = byID
         rebuildIndexes()
         if let id = selectedMeetingID, meeting(id) == nil { selectedMeetingID = nil }
     }
@@ -511,6 +524,22 @@ final class AppModel {
         sidebarSelection = .person(key)
     }
 
+    /// Calendar → list: shows the meeting under Upcoming (today onwards) or
+    /// Past, selected, scrolled to and with its heading expanded.
+    func showInList(_ id: UUID) {
+        guard let m = meeting(id) else { return }
+        let filter: DateFilter = m.date >= today ? .upcoming : .past
+        collapsedBuckets.remove(DateBucketer(today: today).bucket(for: m.date).id)
+        // Select first, so switching to the list keeps the selection.
+        selectedMeetingID = id
+        if sidebarSelection != .dates(filter) {
+            sidebarSelection = .dates(filter)
+        }
+        viewMode = .list
+        searchText = ""
+        listScrollTarget = id
+    }
+
     func showPreviousMonth() { displayedMonth = displayedMonth.adding(months: -1) }
     func showNextMonth() { displayedMonth = displayedMonth.adding(months: 1) }
     func showToday() {
@@ -580,8 +609,11 @@ final class AppModel {
         pendingSaves.remove(id)
         guard let ws = workspace, let i = index(id) else { return }
         do {
+            let before = meetings[i].relativePath
             let saved = try ws.save(meetings[i])
             meetings[i].relativePath = saved.relativePath
+            // A rename moves the attachments folder too.
+            if before != saved.relativePath, attachments[id] != nil { reloadAttachments(id) }
         } catch {
             alert = AlertInfo(title: "Couldn\u{2019}t Save \u{201C}\(meetings[i].title)\u{201D}",
                               message: error.localizedDescription)
@@ -702,6 +734,10 @@ final class AppModel {
         if let path = m.relativePath {
             do {
                 try Platform.trash(ws.url(for: path))
+                let folder = ws.url(for: Workspace.attachmentsFolder(forMeetingPath: path))
+                if FileManager.default.fileExists(atPath: folder.path) {
+                    try Platform.trash(folder)
+                }
             } catch {
                 alert = AlertInfo(title: "Couldn\u{2019}t Delete Meeting", message: error.localizedDescription)
                 return
@@ -710,6 +746,7 @@ final class AppModel {
         }
         if selectedMeetingID == m.id { selectedMeetingID = nil }
         meetings.removeAll { $0.id == m.id }
+        attachments[m.id] = nil
         rebuildIndexes()
     }
 
@@ -745,6 +782,84 @@ final class AppModel {
     func copyLocation(_ id: UUID?) {
         guard let m = meeting(id ?? selectedMeetingID), !m.location.isEmpty else { return }
         Platform.copy(m.location.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    // MARK: Attachments
+
+    func attachmentURL(_ a: Attachment) -> URL? {
+        workspace?.url(for: a.relativePath)
+    }
+
+    private func reloadAttachments(_ id: UUID) {
+        guard let ws = workspace, let path = meeting(id)?.relativePath else { return }
+        let list = ws.attachments(forMeetingPath: path)
+        attachments[id] = list.isEmpty ? nil : list
+    }
+
+    /// Add Attachments… (⇧⌘A): choose files to copy into the meeting's folder.
+    func chooseAttachments(_ id: UUID?) {
+        guard let m = meeting(id ?? selectedMeetingID) else { return }
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Attach"
+        panel.message = "Choose files to attach to \u{201C}\(m.title)\u{201D}. They are copied into the meeting\u{2019}s folder."
+        guard panel.runModal() == .OK else { return }
+        addAttachments(panel.urls, to: m.id)
+    }
+
+    func addAttachments(_ urls: [URL], to id: UUID) {
+        guard let ws = workspace, !urls.isEmpty else { return }
+        flushSaves()
+        guard let path = meeting(id)?.relativePath else { return }
+        do {
+            try ws.addAttachments(urls, toMeetingPath: path)
+        } catch {
+            alert = AlertInfo(title: "Couldn\u{2019}t Attach Files", message: error.localizedDescription)
+        }
+        reloadAttachments(id)
+    }
+
+    /// Files dropped on the meeting pane. False if the drop holds no files.
+    func importDroppedFiles(_ providers: [NSItemProvider], to id: UUID) -> Bool {
+        let files = providers.filter { $0.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) }
+        guard !files.isEmpty else { return false }
+        for provider in files {
+            _ = provider.loadObject(ofClass: URL.self) { [weak self] url, _ in
+                guard let url, let model = self else { return }
+                Task { @MainActor in model.addAttachments([url], to: id) }
+            }
+        }
+        return true
+    }
+
+    func quickLook(_ a: Attachment, of id: UUID) {
+        let urls = (attachments[id] ?? []).compactMap(attachmentURL)
+        quickLookURLs = urls
+        quickLookURL = attachmentURL(a)
+    }
+
+    func openAttachment(_ a: Attachment) {
+        if let url = attachmentURL(a) { Platform.open(url) }
+    }
+
+    func revealAttachment(_ a: Attachment) {
+        if let url = attachmentURL(a) { Platform.reveal([url]) }
+    }
+
+    /// Moves an attachment to the Trash (so it can be put back from Finder),
+    /// and the folder too once it is empty.
+    func removeAttachment(_ a: Attachment, from id: UUID) {
+        guard let ws = workspace, let url = attachmentURL(a) else { return }
+        do {
+            try Platform.trash(url)
+        } catch {
+            alert = AlertInfo(title: "Couldn\u{2019}t Remove \u{201C}\(a.name)\u{201D}", message: error.localizedDescription)
+            return
+        }
+        if let path = meeting(id)?.relativePath { ws.removeAttachmentsFolderIfEmpty(forMeetingPath: path) }
+        reloadAttachments(id)
     }
 
     // MARK: Notes

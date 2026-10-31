@@ -1,7 +1,5 @@
 # QDVC Meetings for macOS
 
-![A screenshot of QDVC Meetings](docs/screenshot.png)
-
 Keep a record of your meetings: when and where they are (a room, a Google
 Maps link, or a Microsoft Teams or Zoom link), who is in them, and the notes,
 decisions and action items that come out of them. A native SwiftUI app for
@@ -25,13 +23,19 @@ Reminders and Mail are explained in [docs/DESIGN.md](docs/DESIGN.md).
   Next Week, …), each showing its time, location, people and a **notes
   badge** with the number of notes, action items and decisions. Meetings
   that have happened without notes say "No notes".
-- **Calendar:** a month grid, as in Calendar. Meetings with notes carry a
-  notes symbol. Double-click a day to add a meeting; drag a meeting to
-  another day to move it. ⌘[ and ⌘] change month, ⌘T returns to today.
+- **Calendar:** a month grid, as in Calendar, using the whole window.
+  Meetings with notes carry a notes symbol, and those with attachments a
+  paperclip. Click a meeting to see it in the list (under Upcoming or Past,
+  selected). Double-click a day to add a meeting; drag a meeting to another
+  day to move it. ⌘[ and ⌘] change month, ⌘T returns to today.
 - **Meeting pane:** the date and time, the location with **Join** (Teams,
   Zoom), **Open Map** (Google Maps) or **Show in Maps** (a place), your
   instructions for the platform as a callout, the people, the description,
-  and the notes.
+  the attachments, and the notes.
+- **Attachments:** add screenshots, photos, PDFs or any other file with ⇧⌘A,
+  the paperclip button, or by dropping them on the meeting. They are copied
+  into a folder beside the meeting's file, shown as thumbnails, and open in
+  Quick Look with a click.
 - **Notes**, edited in place as in Reminders: Return starts the next note,
   Return on an empty note stops. Each note is a plain note, an **action
   item** (⌥⌘A) or a **decision** (⌥⌘D). Action items get an "Assigned to"
@@ -106,8 +110,8 @@ because a bare executable has no bundle to carry it.
 
 ## Where things are stored
 
-- Your meetings and platform instructions: only in the workspace folder you
-  open, in the format described in [docs/FILE_FORMAT.md](docs/FILE_FORMAT.md).
+- Your meetings, their attachments and platform instructions: only in the
+  workspace folder you open, in the format described in [docs/FILE_FORMAT.md](docs/FILE_FORMAT.md).
   Every change is written to disk straight away (typing in a note, after a
   short pause).
 - Preferences (default meeting length, list or calendar, recent
@@ -126,6 +130,7 @@ because a bare executable has no bundle to carry it.
 | ⌘D | Duplicate the selected meeting (a week later) |
 | ⌘⌫ | Delete the selected meeting (to the Trash) |
 | ⌘J | Join / Open Map / Show in Maps |
+| ⇧⌘A | Add attachments to the selected meeting |
 | ⌥⌘0 / ⌥⌘A / ⌥⌘D | Make the focused note a note / an action item / a decision |
 | ⌥⌘↑ / ⌥⌘↓ | Move the focused note up / down |
 | ⌥⌘E | Export notes as a Word document |
@@ -136,7 +141,8 @@ because a bare executable has no bundle to carry it.
 | ⌘R | Refresh from disk |
 | ⌘O / ⇧⌘W | Open / close workspace |
 | ⌘, | Settings |
-| Double-click | A meeting: edit it. An empty day in the calendar: new meeting |
+| Click | A calendar meeting: show it in the list. An attachment: Quick Look |
+| Double-click | A meeting in the list: edit it. An empty day in the calendar: new meeting |
 
 ## Documentation
 

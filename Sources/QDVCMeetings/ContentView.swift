@@ -18,6 +18,7 @@ struct ContentView: View {
             }
         }
         .navigationTitle(model.windowTitle)
+        .quickLookPreview($model.quickLookURL, in: model.quickLookURLs)
         .sheet(item: $model.activeSheet) { sheet in
             SheetContent(sheet: sheet)
                 .environment(model)
@@ -79,20 +80,20 @@ struct MainSplitView: View {
         } detail: {
             VStack(spacing: 0) {
                 BannerStack()
-                HSplitView {
-                    Group {
-                        switch model.viewMode {
-                        case .list:
-                            MeetingListView()
-                                .frame(minWidth: 300, idealWidth: 380, maxWidth: 600)
-                        case .calendar:
-                            CalendarMonthView()
-                                .frame(minWidth: 520, idealWidth: 720, maxWidth: .infinity)
-                        }
+                switch model.viewMode {
+                case .list:
+                    // The list and the meeting pane side by side, as in Mail.
+                    HSplitView {
+                        MeetingListView()
+                            .frame(minWidth: 300, idealWidth: 380, maxWidth: 600, maxHeight: .infinity)
+                        MeetingPane()
+                            .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
                     }
-                    .frame(maxHeight: .infinity)
-                    MeetingPane()
-                        .frame(minWidth: 360, maxWidth: .infinity, maxHeight: .infinity)
+                case .calendar:
+                    // The calendar alone, using the full width; clicking a
+                    // meeting shows it in the list.
+                    CalendarMonthView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
         }
@@ -152,13 +153,15 @@ struct MainToolbar {
             }
             .help("New meeting (\u{2318}N)")
 
-            Menu {
-                ExportMenuItems(meetingID: model.selectedMeetingID)
-            } label: {
-                Label("Export Notes", systemImage: model.justCopied ? "checkmark" : "square.and.arrow.up")
+            if model.viewMode == .list {
+                Menu {
+                    ExportMenuItems(meetingID: model.selectedMeetingID)
+                } label: {
+                    Label("Export Notes", systemImage: model.justCopied ? "checkmark" : "square.and.arrow.up")
+                }
+                .help("Export the selected meeting\u{2019}s notes as Word or Markdown, or copy them as plain text")
+                .disabled(model.selectedMeeting == nil)
             }
-            .help("Export the selected meeting\u{2019}s notes as Word or Markdown, or copy them as plain text")
-            .disabled(model.selectedMeeting == nil)
         }
     }
 }
